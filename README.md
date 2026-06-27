@@ -2,8 +2,8 @@
 
 > **An AI-first, multi-language microservices digital culinary platform** — bridging culinary creativity, food sustainability, and local e-commerce.
 
-[![Live Demo](https://img.shields.io/badge/Live_Demo-eattoday--web.vercel.app-000000?style=for-the-badge&logo=vercel)](https://eattoday-web.vercel.app/)
-[![Release](https://img.shields.io/badge/release-v0.1.1_(prep)-blue?style=for-the-badge)](#current-focus-v011)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-www.eattoday.net-000000?style=for-the-badge&logo=vercel)](https://www.eattoday.net/)
+[![Release](https://img.shields.io/badge/release-v0.1.1-success?style=for-the-badge)](#release-v011--deployment-stabilization)
 [![Architecture](https://img.shields.io/badge/architecture-microservices-orange?style=for-the-badge)](#system-architecture-overview)
 
 > **Disclaimer:** This is a **public architecture showroom**. The original implementation repository is private because it contains sensitive development information — secrets, credentials, payment integration code, and proprietary business logic. This repository contains **no backend source, frontend source, secrets, or deployable artifacts** — only architecture, design rationale, and engineering process derived from the real codebase.
@@ -26,7 +26,8 @@ API gateway that enforces authentication, CORS, and routing at the edge).
 
 It is built as five backend microservices (Java/Spring Boot, Python/FastAPI, Node.js/Express),
 a Next.js storefront with a dedicated Backend-for-Frontend layer, an Apache APISIX gateway, and
-Stripe-backed payments — deployed across Vercel, AWS, Google Cloud Run, and Neon.
+Stripe-backed payments — deployed across Vercel, AWS, Google Cloud Run, and Neon, and served from
+the official **`www.eattoday.net`** domain (Cloudflare DNS).
 
 ---
 
@@ -34,18 +35,22 @@ Stripe-backed payments — deployed across Vercel, AWS, Google Cloud Run, and Ne
 
 | Layer | URL | Hosting |
 | --- | --- | --- |
-| **Web Client** | **[eattoday-web.vercel.app](https://eattoday-web.vercel.app/)** | Vercel CDN Edge / Static Assets (`apps/web-client`) |
+| **DNS / Edge** | **[www.eattoday.net](https://www.eattoday.net/)** | Cloudflare DNS — official domain; apex `eattoday.net` 308-redirects to `www` |
+| **Web Client** | **[www.eattoday.net](https://www.eattoday.net/)** | Vercel CDN Edge / Static Assets (`apps/web-client`) |
 | **BFF API Layer** | [eattoday-bff.vercel.app](https://eattoday-bff.vercel.app) | Vercel Serverless Functions (`apps/bff`) |
 | **API Gateway** | AWS EC2 `t3.micro`, `eu-west-2` (London) | Apache APISIX data plane (port `9080`) |
 | **Backend Services** | Google Cloud Run, `europe-west2` | 5 serverless containers via Artifact Registry |
 | **Database** | Neon, London region | Serverless PostgreSQL 15 (pooled connections) |
 
-**End-to-end production path:**
-`Vercel UI → Vercel BFF → AWS EC2 (APISIX gateway) → Google Cloud Run services → Neon Postgres`
+The legacy `https://eattoday-web.vercel.app` URL still resolves and remains a valid alias.
 
-**Current release status:** **v0.1.1 in preparation.** v0.1.0 reached a fully deployed
-multi-cloud MVP; v0.1.1 focuses on **deployment stabilization and cross-cloud troubleshooting**
-(see [Current Focus](#current-focus-v011)).
+**End-to-end production path:**
+`Cloudflare DNS (www.eattoday.net) → Vercel UI → Vercel BFF → AWS EC2 (APISIX gateway) → Google Cloud Run services → Neon Postgres`
+
+**Current release status:** **v0.1.1 shipped (tagged).** v0.1.0 reached a fully deployed
+multi-cloud MVP; **v0.1.1 stabilized the cross-cloud deployment** and bound the official
+**`www.eattoday.net`** domain (Cloudflare DNS) to the production frontend
+(see [Release: v0.1.1](#release-v011--deployment-stabilization)).
 
 ---
 
@@ -132,7 +137,9 @@ graph TD
     end
 
     Stripe["Stripe API (external)"]
+    DNS["Cloudflare DNS · www.eattoday.net"]
 
+    DNS -->|"HTTPS (apex eattoday.net → www, 308)"| Web
     Web -->|"HTTPS /api/* (rewrite)"| BFF
     BFF -->|"HTTPS REST (BACKEND_BASE_URL → /api)"| APISIX
     APISIX -->|"forward-auth introspection"| Auth
@@ -380,26 +387,32 @@ concurrent serverless load.
 
 ---
 
-## Current Focus: v0.1.1
+## Release: v0.1.1 — Deployment Stabilization
 
-After v0.1.0 reached a fully deployed multi-cloud MVP, v0.1.1 concentrates on **deployment
-stabilization and cross-cloud troubleshooting** — the hard part of making a distributed system
-actually work end-to-end across four providers.
+After v0.1.0 reached a fully deployed multi-cloud MVP, **v0.1.1 (now shipped and tagged)**
+concentrated on **deployment stabilization and cross-cloud troubleshooting** — the hard part of
+making a distributed system actually work end-to-end across four providers — and on binding a
+production-grade custom domain.
 
-**In scope:**
+**Delivered in v0.1.1:**
 
-- **Auth propagation fixes (BFF → gateway).** Resolving `401` errors caused by token handling
+- **Official custom domain via Cloudflare DNS.** Bound **`www.eattoday.net`** to the Vercel
+  production frontend, with the apex `eattoday.net` issuing a 308 redirect to `www`. The legacy
+  `eattoday-web.vercel.app` URL remains a valid alias.
+- **Auth propagation fixes (BFF → gateway).** Resolved `401` errors caused by token handling
   across cloud boundaries — faithfully proxying the `Authorization` header / LocalStorage token
   through the BFF to APISIX, and returning the access token in sign-in/sign-up responses for
   reliable client-side persistence.
-- **Dynamic, environment-driven gateway config.** Making APISIX upstreams and the CORS allowlist
+- **Dynamic, environment-driven gateway config.** Made APISIX upstreams and the CORS allowlist
   fully dynamic (`UPSTREAM_*`, `ALLOWED_ORIGINS`) so the same IaC script works locally and against
   live Cloud Run hosts.
 - **Context-aware routing refactor** and API prefix rewriting at the edge.
 - **Cloud Run cold-start mitigation** and Neon production seed/connection hardening.
+- **CI hygiene hotfix.** Disabled the automated E2E suite from running against the live production
+  environment, keeping production traffic clean while preserving Docker/staging E2E coverage.
 
-**Out of scope (deferred):** the automated GitHub Actions CD pipeline for Cloud Run, and bringing
-the AI and community services from skeleton stage to full implementation.
+**Out of scope (deferred to v0.2.0):** the automated GitHub Actions CD pipeline for Cloud Run, and
+bringing the AI and community services from skeleton stage to full implementation.
 
 ---
 
