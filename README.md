@@ -3,7 +3,7 @@
 > **An AI-first, multi-language microservices digital culinary platform** — bridging culinary creativity, food sustainability, and local e-commerce.
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-www.eattoday.net-000000?style=for-the-badge&logo=vercel)](https://www.eattoday.net/)
-[![Release](https://img.shields.io/badge/release-v0.1.1-success?style=for-the-badge)](#release-v011--deployment-stabilization)
+[![Release](https://img.shields.io/badge/release-v0.2.0-success?style=for-the-badge)](#release-v020--mobile-ux-overhaul)
 [![Architecture](https://img.shields.io/badge/architecture-microservices-orange?style=for-the-badge)](#system-architecture-overview)
 
 > **Disclaimer:** This is a **public architecture showroom**. The original implementation repository is private because it contains sensitive development information — secrets, credentials, payment integration code, and proprietary business logic. This repository contains **no backend source, frontend source, secrets, or deployable artifacts** — only architecture, design rationale, and engineering process derived from the real codebase.
@@ -47,10 +47,12 @@ The legacy `https://eattoday-web.vercel.app` URL still resolves and remains a va
 **End-to-end production path:**
 `Cloudflare DNS (www.eattoday.net) → Vercel UI → Vercel BFF → AWS EC2 (APISIX gateway) → Google Cloud Run services → Neon Postgres`
 
-**Current release status:** **v0.1.1 shipped (tagged).** v0.1.0 reached a fully deployed
+**Current release status:** **v0.2.0 shipped (tagged).** v0.1.0 reached a fully deployed
 multi-cloud MVP; **v0.1.1 stabilized the cross-cloud deployment** and bound the official
-**`www.eattoday.net`** domain (Cloudflare DNS) to the production frontend
-(see [Release: v0.1.1](#release-v011--deployment-stabilization)).
+**`www.eattoday.net`** domain (Cloudflare DNS) to the production frontend; **v0.2.0 is a
+client-side Mobile UX Overhaul** that closes a P0 mobile-navigation gap and makes the Next.js
+storefront fully responsive across mobile and tablet breakpoints
+(see [Release: v0.2.0](#release-v020--mobile-ux-overhaul)).
 
 ---
 
@@ -411,8 +413,48 @@ production-grade custom domain.
 - **CI hygiene hotfix.** Disabled the automated E2E suite from running against the live production
   environment, keeping production traffic clean while preserving Docker/staging E2E coverage.
 
-**Out of scope (deferred to v0.2.0):** the automated GitHub Actions CD pipeline for Cloud Run, and
-bringing the AI and community services from skeleton stage to full implementation.
+**Out of scope at the time (deferred to a later release):** the automated GitHub Actions CD
+pipeline for Cloud Run, and bringing the AI and community services from skeleton stage to full
+implementation. *(v0.2.0 instead prioritized a P0 mobile-usability fix — see below — so these
+items remain deferred.)*
+
+---
+
+## Release: v0.2.0 — Mobile UX Overhaul
+
+With the multi-cloud backend stabilized in v0.1.x, **v0.2.0 (now shipped and tagged)** shifts
+focus from cross-cloud plumbing to the **client experience**, hardening the Next.js storefront
+across mobile and tablet breakpoints. It closes a **P0 gap** where core navigation was
+effectively unreachable on small screens.
+
+**Delivered in v0.2.0:**
+
+- **Responsive mobile navigation (REF-S13 · P0 bug).** The right-side nav controls (the *You*
+  menu, *Login*, *Register*) — previously hidden entirely below the `sm` breakpoint — now collapse
+  behind an accessible hamburger toggle (`aria-expanded` / `aria-controls`, focus ring) that opens
+  a collapsible, elevated panel exposing every primary action on mobile. The desktop layout is
+  unchanged (no regression).
+- **Mobile dashboard list drill-down (REF-S14 · P1 UX).** The *You* user-center was a stacked
+  two-column layout that only engaged at `lg`, forcing heavy scrolling on phones and tablets. It
+  now uses a **URL-driven (`?tab=`) drill-down** on mobile: with no tab, a full-width
+  "Settings"-style list renders (label + right-chevron, divider rows); selecting an item shows only
+  that section, with a "Back to Menu" control to return. The two-column grid now engages at `sm`,
+  so tablets get the desktop two-pane view too.
+- **Regression-guarded by Playwright.** A new `responsive-nav.spec.ts` UI suite asserts the
+  hamburger reveals the correct actions for logged-in and logged-out users, that selecting an item
+  collapses the panel, and that on desktop the toggle stays hidden while the inline controls remain
+  reachable.
+- **Consolidated engineering runbook.** A single `DEVELOPMENT.md` now captures the local/prod
+  operational procedures (DB seeding & cleanup, secrets management, Stripe webhook config, gateway
+  route updates, Cloud Run cold-start tuning, and the decoupled CD strategy).
+
+**Architectural note:** v0.2.0 is deliberately **client-side only** — breakpoint-driven UI and
+URL-state changes. No API contracts, gateway routes, service boundaries, or data tiers were
+touched, so every architecture diagram above remains accurate as of v0.2.0.
+
+**Still deferred (post-v0.2.0):** the automated GitHub Actions CD pipeline for Cloud Run, the AI
+and community services from skeleton to full implementation, and a client-side `504` cold-start
+retry interceptor (REF-S12, still in backlog).
 
 ---
 
